@@ -72,17 +72,10 @@ $euCountries = [
 ];
 
 // Determine VAT application
-if ($customerCountry == 'RO') {
-    $applyVAT = true; // Always apply VAT for Romania
-} elseif (in_array($customerCountry, $euCountries) && empty($vatNumber)) {
-    $applyVAT = $taxExempt == 'none'; // Apply VAT if not tax-exempt and no valid VAT number
-} else {
-    $applyVAT = false; // Non-EU or valid VAT number
-}
+$isEUCountry = in_array($customerCountry, $euCountries);
 
-if (!$applyVAT) {
-    $vatPercentage = 0; // Set VAT to 0% if it's not applied
-}
+// Determine VAT payer status
+$vatPayer = $isEUCountry;
 
 $countryNamesInRomanian = [
     'AF' => 'Afganistan',
@@ -349,7 +342,7 @@ $defaultData = [
         'country' => $countryNameInRomanian,
         'email' => $stripeInvoice['customer_email'],
         'phone' => '', // Add phone number if available
-        'vatPayer' => $applyVAT, // Specify if the client is a VAT payer
+        'vatPayer' => $vatPayer, // Specify if the client is a VAT payer
         // Add other client details as needed
     ],
     'issueDate' => $issueDate, 
