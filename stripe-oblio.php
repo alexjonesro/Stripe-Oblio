@@ -32,7 +32,7 @@ $vatName = null;
 $vatPercentage = round(($paidAmount - $stripeInvoice['lines']['data'][0]['amount_excluding_tax']) / $stripeInvoice['lines']['data'][0]['amount_excluding_tax'] * 100, 1); 
 
 if ($vatPercentage === 0.0) {
-                 $vatName = 'SDD';
+                 $vatName = 'Taxare inversa';
              }
 
 // Convert cents to standard currency format
@@ -70,6 +70,7 @@ $euCountries = [
     'GB', // United Kingdom
     'CH', // Switzerland
 ];
+
 
 // Determine VAT application
 $isEUCountry = in_array($customerCountry, $euCountries);
@@ -332,7 +333,7 @@ $countryNameInRomanian = $countryNamesInRomanian[$customerCountry] ?? 'Unknown';
 
 // Map Stripe data to Oblio invoice fields
 $defaultData = [
-    'cif' => '48862248', // Replace with your company's CIF
+    'cif' => 'CIF', // Replace with your company's Eu VAT CIF
     'client' => [
         'cif' => $vatNumber, // Map Stripe customer ID to Oblio client CIF
         'name' => $stripeInvoice['customer_name'],
@@ -349,10 +350,10 @@ $defaultData = [
     'dueDate' => date('Y-m-d', strtotime('+30 days', $stripeInvoice['created'])),
     'deliveryDate' => '', // Specify delivery date if applicable
     'collectDate' => '', // Specify collect date if applicable
-    'seriesName' => 'SS', 
+    'seriesName' => 'FD', // Change as needed
     'language' => 'EN', 
     'precision' => 2,
-    'currency' => 'USD',
+    'currency' => 'USD', // Change as needed
     'collect' => [
         "type" => "Card",
         "documentNumber" => $stripeInvoice['charge'],
@@ -366,10 +367,10 @@ $defaultData = [
             'description' => '', // Add product description if needed
             'price' => $stripeInvoice['lines']['data'][0]['amount'] / 100, 
             'measuringUnit' => 'buc', 
-            'currency' => 'USD',
-            'vatName' => $vatName, 
+            'currency' => 'USD', // Change as needed
+            'vatName' => 'Normala',
             'vatPercentage' => $vatPercentage,
-            'vatIncluded' => 0, 
+            'vatIncluded' => false, 
             'quantity' => 1, 
             'productType' => 'Serviciu', 
             'management' => '' // Add management type if applicable
@@ -388,7 +389,6 @@ $defaultData = [
     'workStation' => 'Sediu', // Specify workstation
     'useStock' => 0, // Specify if using stock
 ];
-
 
 try {
     $oblioApi = new OblioSoftware\Api('EMAIL', 'APIKEY');
