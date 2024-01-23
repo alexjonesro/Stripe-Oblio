@@ -1,6 +1,6 @@
 Stripe integration with Oblio.eu API implementation for PHP using webhooks.
 
-Daca vinzi in EU/international ceeaza o companie noua in Oblio cu codul de TVA intracomunitar al companiei. https://www.oblio.eu/intrebari-frecvente/cum-adaug-codul-tva-intracomunitar
+Daca vinzi in EU/international creeaza o companie noua in Oblio cu codul de TVA intracomunitar al companiei. https://www.oblio.eu/intrebari-frecvente/cum-adaug-codul-tva-intracomunitar
 Vei folosi datele acelea pentru a putea adauga TVA intracomunitar pe facturi.
 *Discutati cu contabilul inainte de a face aceste schimbari.
 Seteaza contul pentru noua companie de la 0 cu toate datele.
