@@ -1,7 +1,7 @@
 <?php
 require_once 'vendor/autoload.php';
 ini_set('log_errors', 1);
-ini_set('error_log', './error.log');
+ini_set('error_log', '/home/error.log'); //replace with your url
 error_reporting(E_ALL);
 
 // Assuming this is the payload from the Stripe webhook
@@ -18,8 +18,8 @@ $customerCountry = $stripeInvoice['customer_address']['country'] ?? '';
 $taxExempt = $stripeInvoice['tax_exempt'] ?? 'none';
 $vatNumber = '';
 
-if (isset($stripeInvoice['tax_ids']) && is_array($stripeInvoice['tax_ids'])) {
-    foreach ($stripeInvoice['tax_ids'] as $tax_id) {
+if (isset($stripeInvoice['customer_tax_ids']) && is_array($stripeInvoice['customer_tax_ids'])) {
+    foreach ($stripeInvoice['customer_tax_ids'] as $tax_id) {
         if ($tax_id['type'] == 'eu_vat') {
             $vatNumber = $tax_id['value'];
             break;
@@ -27,16 +27,39 @@ if (isset($stripeInvoice['tax_ids']) && is_array($stripeInvoice['tax_ids'])) {
     }
 }
 
-$paidAmount = $stripeInvoice['total'];
-$vatName = null;
-$vatPercentage = round(($paidAmount - $stripeInvoice['lines']['data'][0]['amount_excluding_tax']) / $stripeInvoice['lines']['data'][0]['amount_excluding_tax'] * 100, 1); 
+$paidAmountStandard = $stripeInvoice['total'] / 100;
+$amountExcludingTaxStandard = $stripeInvoice['lines']['data'][0]['amount_excluding_tax'] / 100;
 
-if ($vatPercentage === 0.0) {
-                 $vatName = 'Taxare inversa';
-             }
+// Initialize vatName with a default value
+$vatName = 'Scutita'; // Default value, adjust as necessary
+
+// Calculate VAT percentage
+if ($amountExcludingTaxStandard > 0) {
+    $vatPercentage = round(($paidAmountStandard - $amountExcludingTaxStandard) / $amountExcludingTaxStandard * 100, 1);
+} else {
+    $vatPercentage = 0; // Default to 0 if there's no amount excluding tax
+}
+
+// Adjust vatName based on VAT percentage
+if ($vatPercentage > 0) {
+    $vatName = null; // Set to appropriate name or leave null if applicable
+}
 
 // Convert cents to standard currency format
 $amount = $stripeInvoice['total'] / 100;
+
+$discountAmount = 0;
+$discountType = 'valoric'; // Default type
+
+// Check if there are any discounts in the Stripe invoice
+if (!empty($stripeInvoice['total_discount_amounts'])) {
+    foreach ($stripeInvoice['total_discount_amounts'] as $discount) {
+        if (isset($discount['amount'])) {
+            $discountAmount += $discount['amount'] / 100; // Convert from cents
+        }
+    }
+}
+
 
 $euCountries = [
     'AT', // Austria
@@ -71,7 +94,7 @@ $euCountries = [
     'CH', // Switzerland
 ];
 
-
+// Determine VAT application
 // Determine VAT application
 $isEUCountry = in_array($customerCountry, $euCountries);
 
@@ -331,9 +354,37 @@ $countryNamesInRomanian = [
 // Get the Romanian name of the country
 $countryNameInRomanian = $countryNamesInRomanian[$customerCountry] ?? 'Unknown';
 
+$products = [
+    [
+        'name' => $stripeInvoice['lines']['data'][0]['description'],
+        'code' => '',
+        'description' => '',
+        'price' => $stripeInvoice['lines']['data'][0]['amount'] / 100,
+        'measuringUnit' => 'buc',
+        'vatName' => $vatName,
+        'vatPercentage' => $vatPercentage,
+        'vatIncluded' => false,
+        'quantity' => $stripeInvoice['lines']['data'][0]['quantity'],
+        'productType' => 'Serviciu',
+        'management' => ''
+    ]
+];
+
+// Add discount information only if there is a discount
+if ($discountAmount > 0) {
+    $products[] = [
+        'name' => 'Discount',
+        'discount' => $discountAmount,
+        'discountType' => $discountType
+    ];
+}
+
+
+
+
 // Map Stripe data to Oblio invoice fields
 $defaultData = [
-    'cif' => 'CIF', // Replace with your company's Eu VAT CIF
+    'cif' => 'CIF', // Replace with your company's CIF
     'client' => [
         'cif' => $vatNumber, // Map Stripe customer ID to Oblio client CIF
         'name' => $stripeInvoice['customer_name'],
@@ -350,32 +401,18 @@ $defaultData = [
     'dueDate' => date('Y-m-d', strtotime('+30 days', $stripeInvoice['created'])),
     'deliveryDate' => '', // Specify delivery date if applicable
     'collectDate' => '', // Specify collect date if applicable
-    'seriesName' => 'FD', // Change as needed
+    'seriesName' => 'FD', 
     'language' => 'EN', 
     'precision' => 2,
-    'currency' => 'USD', // Change as needed
+    'currency' => 'USD',
+	'exchangeRate' => "0.000000",
     'collect' => [
         "type" => "Card",
         "documentNumber" => $stripeInvoice['charge'],
 		"value" => $stripeInvoice['total'] / 100,
 		"issueDate" => $issueDate, 
     ],
-    'products' => [
-        [
-            'name' => $stripeInvoice['lines']['data'][0]['description'],
-            'code' => '', // Add product code if available
-            'description' => '', // Add product description if needed
-            'price' => $stripeInvoice['lines']['data'][0]['amount'] / 100, 
-            'measuringUnit' => 'buc', 
-            'currency' => 'USD', // Change as needed
-            'vatName' => 'Normala',
-            'vatPercentage' => $vatPercentage,
-            'vatIncluded' => false, 
-            'quantity' => 1, 
-            'productType' => 'Serviciu', 
-            'management' => '' // Add management type if applicable
-        ]
-    ],
+    'products' => $products,
     'issuerName' => '', // Add issuer name
     'issuerId' => '', // Add issuer ID
     'noticeNumber' => '', // Add notice number if applicable
@@ -391,11 +428,17 @@ $defaultData = [
 ];
 
 try {
-    $oblioApi = new OblioSoftware\Api('EMAIL', 'APIKEY');
+    $oblioApi = new OblioSoftware\Api('email', 'apikey');
     $result = $oblioApi->createInvoice($defaultData);
     // Handle successful creation
-} catch (Exception $e) {
+} catch (\Exception $e) {
     error_log("Error: " . $e->getMessage());
-    // Custom error handler
+    if ($e instanceof \GuzzleHttp\Exception\ClientException) {
+        // GuzzleHttp exception handling
+        $responseBody = $e->getResponse()->getBody(true);
+        error_log("API Response: " . $responseBody);
+    }
+    // other error handling...
 }
+
 ?>
